@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jun  8 14:24:58 2022
 
-@author: kunnu
+
+@author: VK
 """
 
 import xml.etree.ElementTree as ET
