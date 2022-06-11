@@ -2,7 +2,7 @@
 Python Dash App for TFL Tube status and Santander bike dock status.
 
 ## Deployment
-The app can be deployed locally using Dash's built-in Flask server. If you want to do this, delete the line below from [app.py]():
+The app can be deployed locally using Dash's built-in Flask server. If you want to do this, delete the line below from [app.py](https://github.com/vk-kota/vk-commute/blob/main/app.py):
 
   server = app.server()
   
