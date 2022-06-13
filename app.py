@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Created on Wed Jun  8 14:24:58 2022
 
 @author: VK
 """
@@ -19,15 +19,16 @@ from dash import html
 from dash import dash_table
 from dash import ctx
 from dash.dependencies import Output, Input, State
+from dash.exceptions import PreventUpdate
 import plotly.express as px
 import plotly.io as pio
 
 pio.renderers.default = "browser"
 
 
-# BIKE_URL = "https://api.tfl.gov.uk/BikePoint/BikePoints_"
 BIKE_URL = "https://api.tfl.gov.uk/BikePoint/"
 TUBE_URL = "http://cloud.tfl.gov.uk/TrackerNet/LineStatus"
+BUS_URL = "https://api.tfl.gov.uk/StopPoint/{stopid}/arrivals"
 
 
 def static_data(fname: str) -> pd.DataFrame:
@@ -130,12 +131,48 @@ class Station:
         return dic
         
         
-# stns = [Station(s) for s in stations]
-# _ = [s.to_dict() for s in stns]
-# data = [Station(s).to_dict() for s in stations]
-# data_df = pd.concat(
-#     [Station(s).to_dataframe() for s in stations], ignore_index=True)
+@dataclass
+class Bus:
+    """
+    Dataclass to hold data for a single bus at a single stop
+    """
+    
+    busdict: dict
+    stop: str = field(init=False)
+    route: str = field(init=False)
+    dest: str = field(init=False)
+    towards: str = field(init=False)
+    eta: pd.Timestamp = field(init=False)
+    reg: str = field(init=False)
+    
+    def __post_init__(self):
+        self.stop = self.busdict['naptanId']
+        self.route = self.busdict['lineId']
+        self.dest = self.busdict['destinationName']
+        self.towards = self.busdict['towards']
+        self.eta = (pd.Timestamp(self.busdict['expectedArrival'])
+                    .tz_convert('Europe/London'))
+        self.reg = self.busdict['vehicleId']
+    
+    
+def GetStopBuses(stopid: str) -> list[dict]:
+    r = requests.get(BUS_URL.format(stopid=stopid))
+    stopinfo = r.json()
+    buses = []
+    for bus in stopinfo:
+        bus_dict = dict(Route=bus['lineId'],
+                        Destination=bus['destinationName'],
+                        ETA=(pd.Timestamp(bus['expectedArrival'])
+                                    .tz_convert('Europe/London')
+                                    .strftime('%H:%M:%S')),
+                        Reg=bus['vehicleId']
+                        )
+        buses.append(bus_dict)
+        buses.sort(key=lambda x: x['ETA'])
+        
+    return buses
 
+bus_stops = pd.read_csv('BusStops.csv')
 
 """
 Dash section
@@ -152,13 +189,14 @@ external_stylesheets = [
 
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server
+server = app.server  ## Comment out this line if you're running locally
 
 
 app.title = "VK Commute Status"
 
 bike_tblcols = ['Name', 'Bikes', 'Spaces', 'Date', 'Time']
 tube_tblcols = ['Line', 'Status']
+bus_tblcols = ['Route', 'Destination', 'ETA', 'Reg']
 
 dock_options = [
     {"label": dock[0], "value": dock[1]}
@@ -169,6 +207,14 @@ tube_options = [
     {"label": line, "value": line}
     for line in lines]
 
+busstop_options = [
+    {"label": stop[1], "value": stop[0]}
+    for _, stop in bus_stops.iterrows()]
+
+# busstop_options_lower = [
+#     {bs['label'].lower(): bs['value']}
+#     for bs in busstop_options]
+
 app.layout = html.Div(
     children=[
         html.Div(
@@ -178,8 +224,8 @@ app.layout = html.Div(
                     children="VK Commute Status", className="header-title"
                 ),
                 html.P(
-                    children="""Check line status and 
-                    availability of bikes and spaces""",
+                    children="""Check tube & bus status and 
+                    availability of bikes & spaces""",
                     className="header-description",
                 ),
                 ],
@@ -267,7 +313,8 @@ app.layout = html.Div(
                                'BikePoints_244',
                                'BikePoints_141',
                                'BikePoints_301',
-                               'BikePoints_106'],
+                               'BikePoints_106',
+                               'BikePoints_306'],
                         multi=True,
                         clearable=True,
                         className="dropdown",
@@ -306,11 +353,89 @@ app.layout = html.Div(
         
         html.Div(
             children=[
+                html.P(
+                    children="Select bus stop [Beta]", className="menu-title"),
+                # html.P(
+                #     children=""""Start typing to get a list of stops.
+                #     To search by bus stop letter code, prefix with '_'. eg to
+                #     search for stop 'LB', type '_LB'. """,
+                #     className="menu-description")
+                    ]
+            ),
+        
+        html.Div(
+            children=[
+                # html.Div(children="Dock 1", className="menu-title"),
+                html.Div(
+                    children=dcc.Dropdown(
+                        id="busstop",
+                        # options=busstop_options,
+                        value='490001180E',
+                        multi=False,
+                        clearable=True,
+                        className="dropdown",
+                        ),
+                    ),
+                ],
+            className="menu",
+            ),
+        
+        html.Div(
+            children=html.Button('Refresh', id='refresh_buses'),
+            className="button"
+            ),
+           
+        html.Div(
+            children=[
+                dash_table.DataTable(
+                    id='buses-table',
+                    # data=data,
+                    columns=[
+                        {"name": k, "id": k} for k in bus_tblcols],
+                    style_as_list_view=True,
+                    style_cell={
+                        'padding': '5px',
+                        'textAlign': 'center'
+                        },
+                    style_header={
+                        'backgroundColor': 'white',
+                        'fontWeight': 'bold',
+                        'textAlign': 'center'
+                        },
+                    )
+                ],
+            className="table"
+            ),
+        
+        html.Div(
+            html.Footer(
+                children=[html.Br(),
+                          """Powered by TfL Open Data""",
+                          html.P(),
+                          """Contains OS data © Crown copyright
+                              and database rights 2016""",
+                          html.P(),
+                          """and Geomni UK Map data ©
+                              and database rights [2019]"""]),
+              ),
+                        
+        html.Div(
+            children=[
                 ])
         ]
     )
 
- 
+
+@app.callback(
+    Output('busstop', 'options'),
+    Input('busstop', 'search_value'))
+def update_bus_dropdown(search_value):
+    if not search_value:
+        raise PreventUpdate
+    return [o for o in busstop_options
+            if search_value.lower() in o["label"].lower()]
+                          
+
 @app.callback(
     Output('lines-table', 'data'),
     # Output('refresh_dock', 'n_clicks'),
@@ -343,6 +468,21 @@ def refresh_dock_table(clicks, docks):
             data = [Station(docks).to_dict()]
         else:
             data = []
+    
+    return data #, 
+
+@app.callback(
+    Output('buses-table', 'data'),
+    # Output('refresh_dock', 'n_clicks'),
+    Input('refresh_buses', 'n_clicks'),
+    Input('busstop', 'value'))
+def refresh_busstop_table(clicks, busstop):
+    data = []
+    if ctx.triggered is not None:
+        # clicks = 0
+        if isinstance(busstop, str):
+            data = GetStopBuses(busstop)
+        
     
     return data #, clicks
 
