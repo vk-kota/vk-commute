@@ -38,6 +38,14 @@ body {
     max-width: 384px;
 }
 
+.menu-description {
+    color: #FFFF00;
+    margin: 4px auto;
+    text-align: left;
+    max-width: 384px;
+    clear: both;
+}
+
 .totals-description {
     color: #FFFF00;
     margin: 4px auto;
@@ -78,11 +86,21 @@ body {
 .Select-control {
     width: 576px;
     height: 8px;
+    min-width: 100px;
     
 }
 
+.dropdown {
+    width: 576px;
+    min-width: 100px;
+}
+
 .Select--single > .Select-control .Select-value, .Select-placeholder {
-    line-height: 8px;
+    line-height: 24px;
+    min-width: 100px;
+    /*width: auto;*/
+    /*padding-bottom: 2px;*/
+    /*padding-top: 2px;*/
 }
 
 .Select--multi .Select-value-label {
