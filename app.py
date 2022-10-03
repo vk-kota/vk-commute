@@ -98,6 +98,7 @@ class Station:
         self.lat = dockinfo['lat']
         self.lon = dockinfo['lon']
         self.nbikes = dockinfo['additionalProperties'][6]['value']
+        self.nebikes = dockinfo['additionalProperties'][10]['value']
         self.nempty = dockinfo['additionalProperties'][7]['value']
         self.ts = (pd.Timestamp(
             dockinfo['additionalProperties'][7]['modified'])
@@ -105,18 +106,20 @@ class Station:
         
     def to_dataframe(self):
         df = pd.DataFrame(columns=[
-            'ID', 'Name', 'Bikes', 'Spaces', 'Lat', 'Lon', 'Date', 'Time',
+            'ID', 'Name', 'Bikes', 'eBikes', 'Spaces', 'Lat', 'Lon', 'Date', 'Time',
             'hover'])
         df['ID'] = [self.ident]
         df['Name'] = [self.name]
         df['Bikes'] = [self.nbikes]
+        df['eBikes'] = [self.nebikes]
         df['Spaces'] = [self.nempty]
         df['Lat'] = [self.lat]
         df['Lon'] = [self.lon]
         df['Date'] = [self.ts.strftime('%a %-d %b')]
         df['Time'] = [self.ts.strftime('%H:%M:%S')]
-        df['hover'] = ['{bikes} Bikes\n{spaces} Spaces\nat {time}'
+        df['hover'] = ['{bikes} Bikes\n{ebikes} eBikes\n {spaces} Spaces\nat {time}'
                        .format(bikes=self.nbikes,
+			       ebikes=self.nebikes,
                                spaces=self.nempty,
                                time=self.ts.strftime('%H:%M:%S'))]
         return df
@@ -125,6 +128,7 @@ class Station:
         dic = dict(ID=self.ident,
                    Name=self.name,
                    Bikes=self.nbikes,
+		   eBikes=self.nebikes,
                    Spaces=self.nempty,
                    Date=self.ts.strftime('%a %-d %b'),
                    Time=self.ts.strftime('%H:%M:%S'))
@@ -194,7 +198,7 @@ server = app.server  ## Comment out this line if you're running locally
 
 app.title = "VK Commute Status"
 
-bike_tblcols = ['Name', 'Bikes', 'Spaces', 'Date', 'Time']
+bike_tblcols = ['Name', 'Bikes', 'eBikes', 'Spaces', 'Date', 'Time']
 tube_tblcols = ['Line', 'Status']
 bus_tblcols = ['Route', 'Destination', 'ETA', 'Reg']
 
@@ -487,5 +491,5 @@ def refresh_busstop_table(clicks, busstop):
     return data #, clicks
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0', port='8050')
+    app.run_server(debug=True, host='0.0.0.0', port='80')
         
