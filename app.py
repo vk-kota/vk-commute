@@ -193,12 +193,13 @@ external_stylesheets = [
 
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server  ## Comment out this line if you're running locally
+## server = app.server  ## Comment out this line if you're running locally
 
 
 app.title = "VK Commute Status"
 
 bike_tblcols = ['Name', 'Bikes', 'eBikes', 'Spaces', 'Date', 'Time']
+ebike_locs = ['Name', 'eBikes']
 tube_tblcols = ['Line', 'Status']
 bus_tblcols = ['Route', 'Destination', 'ETA', 'Reg']
 
@@ -218,6 +219,11 @@ busstop_options = [
 # busstop_options_lower = [
 #     {bs['label'].lower(): bs['value']}
 #     for bs in busstop_options]
+
+all_docks = pd.DataFrame(requests.get(BIKE_URL).json())
+ebikes = pd.DataFrame(pd.DataFrame(all_docks['additionalProperties'].to_list(), index=all_docks.index).iloc[:, 10].to_dict()).T
+ebikes = ebikes['value'].astype(int)
+total_ebikes = ebikes[ebikes < 99].sum()
 
 app.layout = html.Div(
     children=[
@@ -327,7 +333,14 @@ app.layout = html.Div(
                 ],
             className="menu",
             ),
-        
+
+        html.Div(
+            children=html.P(
+                children="Total eBikes Available: {}".format(total_ebikes),
+                className="menu"),
+
+        ),
+
         html.Div(
             children=html.Button('Refresh', id='refresh_dock'),
             className="button"
@@ -491,5 +504,5 @@ def refresh_busstop_table(clicks, busstop):
     return data #, clicks
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0', port='80')
+    app.run_server(debug=True)
         
